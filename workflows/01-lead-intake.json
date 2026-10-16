@@ -1,0 +1,465 @@
+{
+  "name": "Lead intake - email a hoja y borrador",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ]
+        },
+        "options": {}
+      },
+      "id": "c322e755-fdca-475e-9af9-b81424721980",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "text": "=Remitente: {{ $json.from.text }}\nAsunto: {{ $json.subject }}\nFecha: {{ $json.date }}\n\n{{ $json.text }}",
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"es_lead\": {\n      \"type\": \"boolean\"\n    },\n    \"nombre\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"email\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"telefono\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"idioma\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"servicio\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ],\n      \"enum\": [\n        \"charter\",\n        \"compra\",\n        \"venta\",\n        \"asesoria\",\n        null\n      ]\n    },\n    \"destino\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"fechas\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"num_personas\": {\n      \"type\": [\n        \"integer\",\n        \"null\"\n      ]\n    },\n    \"presupuesto\": {\n      \"type\": [\n        \"string\",\n        \"null\"\n      ]\n    },\n    \"resumen\": {\n      \"type\": \"string\"\n    }\n  },\n  \"required\": [\n    \"es_lead\",\n    \"nombre\",\n    \"email\",\n    \"telefono\",\n    \"idioma\",\n    \"servicio\",\n    \"destino\",\n    \"fechas\",\n    \"num_personas\",\n    \"presupuesto\",\n    \"resumen\"\n  ]\n}",
+        "options": {
+          "systemPromptTemplate": "Eres un asistente que analiza correos entrantes de una empresa de charter y compraventa de yates.\n\nTu tarea es extraer datos del correo. No redactas respuestas ni das opiniones.\n\nReglas:\n- Extrae solo lo que aparece de forma explícita en el correo (cuerpo, firma o remitente).\n- Si un dato no aparece, devuelve null. No deduzcas, no completes y no inventes valores.\n- No conviertas monedas ni cambies las fechas: copia el presupuesto y las fechas tal y como los escribe el cliente.\n- es_lead: true solo si el correo es una solicitud real de un posible cliente sobre charter, compra, venta o asesoría de yates. Pon false si es publicidad, spam, un newsletter, una factura, un proveedor ofreciendo servicios o cualquier otra cosa que no sea una solicitud de un cliente.\n- servicio: uno de \"charter\", \"compra\", \"venta\" o \"asesoria\". Si no está claro, null.\n- idioma: código ISO 639-1 del idioma en que está escrito el correo (por ejemplo \"es\", \"en\", \"de\").\n- num_personas: número entero solo si el cliente lo indica.\n- resumen: una o dos frases en español que describan lo que pide el cliente. Si no es un lead, resume brevemente qué es el correo."
+        }
+      },
+      "id": "80573f27-3f09-4440-9aef-095abe0854fa",
+      "name": "Extraer datos",
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "id": "3cfbaf16-3b0f-4994-bb64-7a3547dc3c05",
+      "name": "Modelo extracción",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        240,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "38808235-85bf-424c-8535-ab27c8f30e4e",
+              "leftValue": "={{ $json.output.es_lead }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "7c635fea-a501-4802-8997-3fdc64b4f603",
+      "name": "¿Es un lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "REEMPLAZAR_CON_ID_DE_TU_HOJA"
+        },
+        "sheetName": {
+          "__rl": true,
+          "mode": "name",
+          "value": "leads"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "id": "={{ $('Gmail Trigger').item.json.id }}",
+            "fecha_recepcion": "={{ $('Gmail Trigger').item.json.date }}",
+            "fecha_estado": "={{ $now.toISODate() }}",
+            "estado": "nuevo",
+            "nombre": "={{ $json.output.nombre }}",
+            "email": "={{ $json.output.email ?? $('Gmail Trigger').item.json.from.value[0].address }}",
+            "telefono": "={{ $json.output.telefono }}",
+            "idioma": "={{ $json.output.idioma }}",
+            "servicio": "={{ $json.output.servicio }}",
+            "destino": "={{ $json.output.destino }}",
+            "fechas": "={{ $json.output.fechas }}",
+            "num_personas": "={{ $json.output.num_personas }}",
+            "presupuesto": "={{ $json.output.presupuesto }}",
+            "resumen": "={{ $json.output.resumen }}",
+            "asunto": "={{ $('Gmail Trigger').item.json.subject }}",
+            "gmail_thread_id": "={{ $('Gmail Trigger').item.json.threadId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_recepcion",
+              "displayName": "fecha_recepcion",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fecha_estado",
+              "displayName": "fecha_estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "estado",
+              "displayName": "estado",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "nombre",
+              "displayName": "nombre",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "telefono",
+              "displayName": "telefono",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "idioma",
+              "displayName": "idioma",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "servicio",
+              "displayName": "servicio",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "destino",
+              "displayName": "destino",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fechas",
+              "displayName": "fechas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "num_personas",
+              "displayName": "num_personas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "presupuesto",
+              "displayName": "presupuesto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "resumen",
+              "displayName": "resumen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "asunto",
+              "displayName": "asunto",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "gmail_thread_id",
+              "displayName": "gmail_thread_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "notas",
+              "displayName": "notas",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "id": "fbffff1b-a216-4bc1-a664-9ad20e09d83c",
+      "name": "Añadir a la hoja",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        800,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Datos extraídos del correo:\n{{ JSON.stringify($('Extraer datos').item.json.output, null, 2) }}\n\nCorreo original:\nAsunto: {{ $('Gmail Trigger').item.json.subject }}\n\n{{ $('Gmail Trigger').item.json.text }}",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Eres el asistente del equipo comercial de una empresa de charter y compraventa de yates. Redactas borradores de respuesta a solicitudes de clientes. Una persona del equipo revisará y enviará cada borrador.\n\nReglas:\n- Escribe en el idioma indicado en el campo \"idioma\". Si es null, usa el idioma del correo original.\n- Tono profesional y cercano. Frases claras, sin exageraciones ni lenguaje publicitario.\n- Agradece el contacto y resume en una frase lo que has entendido de la solicitud.\n- No menciones precios, tarifas, descuentos, disponibilidad ni plazos. No asumas ningún compromiso.\n- Si faltan datos importantes para avanzar (fechas, número de personas, destino, presupuesto o, en compraventa, tipo y eslora de barco), pídelos de forma breve.\n- Propón un siguiente paso sencillo, por ejemplo una llamada corta.\n- No inventes nombres de barcos, personas ni datos de la empresa.\n- Firma como \"El equipo comercial\".\n- Devuelve solo el cuerpo del correo, sin asunto y sin comentarios adicionales."
+            }
+          ]
+        }
+      },
+      "id": "ae8f096d-a451-4b33-9f7b-a82bd8eacf10",
+      "name": "Redactar respuesta",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1040,
+        -100
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-5-mini"
+        },
+        "options": {}
+      },
+      "id": "92168721-c277-4140-9c12-6b184f79fa52",
+      "name": "Modelo redacción",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        1040,
+        120
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re: {{ $('Gmail Trigger').item.json.subject }}",
+        "message": "={{ $json.text }}",
+        "options": {
+          "threadId": "={{ $('Gmail Trigger').item.json.threadId }}",
+          "sendTo": "={{ $('Extraer datos').item.json.output.email ?? $('Gmail Trigger').item.json.from.value[0].address }}"
+        }
+      },
+      "id": "968c4451-8578-4ab0-9555-f5b438999dd9",
+      "name": "Guardar borrador",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        -100
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "d9265eb2-5de6-466c-8f45-3458450fc7ac",
+      "name": "No es un lead",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        800,
+        120
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo extracción": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extraer datos",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer datos": {
+      "main": [
+        [
+          {
+            "node": "¿Es un lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "¿Es un lead?": {
+      "main": [
+        [
+          {
+            "node": "Añadir a la hoja",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No es un lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Añadir a la hoja": {
+      "main": [
+        [
+          {
+            "node": "Redactar respuesta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo redacción": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Redactar respuesta",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redactar respuesta": {
+      "main": [
+        [
+          {
+            "node": "Guardar borrador",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Europe/Madrid"
+  },
+  "active": false
+}
